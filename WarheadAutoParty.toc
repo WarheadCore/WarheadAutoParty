@@ -1,0 +1,18 @@
+## Interface: 70300
+## Title: |cFFFF0000Warhead:|r Автопати
+## Version: 0.0.1
+## Author: WarheadCore
+## Notes: Авто приём в пати
+## OptionalDeps: Ace3
+## SavedVariablesPerCharacter: WarheadAutoPartyCharacterDB
+## X-Date: 2022-12-07
+## X-Embeds: Ace3
+
+embeds.xml
+libs\DropDownMenu\UIDropDownMenuTemplates.xml
+libs\DropDownMenu\UIDropDownMenu.lua
+libs\DropDownMenu\EasyMenu.lua
+
+WarheadAutoParty.lua
+
+ui\main_options.lua
