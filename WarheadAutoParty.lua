@@ -19,9 +19,48 @@ WarheadAutoParty.defaults =
     words = { "+", "++", "+++", "пати" },
     version = TOCVersion,
     debug = true,
+    makeRaid = false,
+    acceptPartyGuild = true
 }
 
 WarheadAutoParty.OptionsPanel = nil
+
+function WarheadAutoParty:CanInvite()
+    local inGroup = IsInGroup()
+    local inRaid = IsInRaid()
+    local isLeader = UnitIsGroupLeader('player')
+    local isAssist = UnitIsGroupAssistant("player")
+    local membersCount = GetNumGroupMembers()
+
+    -- Always can if no any group
+    if not inGroup then
+        return true
+    end
+
+    -- Can convert to raid
+    if inGroup and membersCount == 5 then
+        if not WarheadAutoPartyCharacterDB.makeRaid then
+            return false
+        end
+
+        if WarheadAutoPartyCharacterDB.makeRaid then
+            ConvertToRaid()
+            return true
+        end
+    end
+
+    -- Group leader
+    if inGroup and isLeader then
+        return true
+    end
+
+    -- Raid leader or raid assist
+    if inRaid and (isLeader or isAssist) then
+        return true
+    end
+
+    return false
+end
 
 function WarheadAutoParty:IsInviteWords(message)
     message = string.lower(message)
@@ -36,11 +75,30 @@ function WarheadAutoParty:IsInviteWords(message)
 end
 
 function WarheadAutoParty:GetCleanPlayerName(playerName)
-    return string.match(playerName, "%u%l+")
+    if (string.find(playerName, "-") == nil) then
+        return playerName
+    end
+
+    local name = string.match(playerName, "^.-%-")
+    return name:sub(0, strlen(name) - 1)
 end
 
 function WarheadAutoParty:IsPlayerSelf(playerName)
     return GetUnitName("player", false) == self:GetCleanPlayerName(playerName)
+end
+
+function WarheadAutoParty:IsPlayerInSameGuild(playerName)
+    local _, numOnlineMembers = GetNumGuildMembers()
+
+    for i = 1, numOnlineMembers do
+        local guildPlayerName = GetGuildRosterInfo(i)
+
+        if (guildPlayerName:find(playerName)) then
+            return true
+        end
+    end
+
+    return false
 end
 
 function WarheadAutoParty:InvitePlayer(playerName, message)
@@ -49,26 +107,32 @@ function WarheadAutoParty:InvitePlayer(playerName, message)
         return
     end
 
+    if not self:CanInvite() then
+        return
+    end
+
     -- Just check self :D
     if self:IsPlayerSelf(playerName) then
         if WarheadAutoPartyCharacterDB.debug then
-            print("|cFFFF0000[WH Автоинвайт]:|r Вы не можете пригласить в пати самого себя")
+            print("|cFFFF0000[WH.Inv]:|r Вы не можете пригласить в пати самого себя")
         end
 
         return
     end
 
-    if UnitInParty(self:GetCleanPlayerName(playerName)) then
+    local cleanPlayerName = self:GetCleanPlayerName(playerName)
+
+    if UnitInParty(cleanPlayerName) then
         if WarheadAutoPartyCharacterDB.debug then
-            print("|cFFFF0000[WH Автоинвайт]:|r |cff14ECCF["..playerName.."]|r Уже в вашей пати")
+            print("|cFFFF0000[WH.Inv]:|r |cff14ECCF["..playerName.."]|r Уже в вашей пати")
         end
 
-        SendChatMessage('[WH Автоинвайт]: Ты уже в моей пати...', "WHISPER", nil, playerName)
+        SendChatMessage('WH: Ты уже в моей пати...', "WHISPER", nil, playerName)
         return
     end
 
     if WarheadAutoPartyCharacterDB.debug then
-        print("|cff6C8CD5Приглашение игрока |cff14ECCF["..playerName.."]") ;
+        print("|cFFFF0000[WH.Inv]:|r Приглашение игрока |cff14ECCF["..playerName.."]") ;
     end
 
     -- SendChatMessage('Я уловил твоё ключевое слово ['..message..'] Держи пати :)', "WHISPER", nil, playerName)
@@ -107,6 +171,7 @@ function WarheadAutoParty:RegisterEvents()
     self:RegisterEvent("CHAT_MSG_WHISPER")
     self:RegisterEvent("CHAT_MSG_GUILD")
     self:RegisterEvent("CHAT_MSG_SAY")
+    self:RegisterEvent("PARTY_INVITE_REQUEST")
 end
 
 function WarheadAutoParty:ShowOptions()
@@ -129,10 +194,10 @@ function WarheadAutoParty:ConsoleComand(arg)
         self:ShowOptions()
     elseif arg == "on" then
         self:SetEnabled(true)
-        self:Print("-cFFFF0000[WH Автоинвайт]:|r Аддон включен")
+        self:Print("|cFFFF0000[WH Автоинвайт]:|r Аддон включен")
     elseif arg == "off"  then
         self:SetEnabled(false)
-        self:Print("-cFFFF0000[WH Автоинвайт]:|r Аддон выключен")
+        self:Print("|cFFFF0000[WH Автоинвайт]:|r Аддон выключен")
     end
 end
 
@@ -161,4 +226,24 @@ function WarheadAutoParty:CHAT_MSG_SAY(...)
 
     local arg1, message, playerName = ...
     self:InvitePlayer(playerName, message)
+end
+
+function WarheadAutoParty:PARTY_INVITE_REQUEST(...)
+    if not WarheadAutoPartyCharacterDB.enabled or not WarheadAutoPartyCharacterDB.acceptPartyGuild then
+        return
+    end
+
+    local arg1, playerName = ...
+
+    if not IsInGuild() then
+        return
+    end
+
+    if not self:IsPlayerInSameGuild(playerName) then
+        return
+    end
+
+    print("|cFFFF0000[WH]:|r Игрок |cff14ECCF"..playerName.."|r из вашей гильдии, принимаем пати")
+    AcceptGroup()
+    StaticPopup_Hide("PARTY_INVITE")
 end

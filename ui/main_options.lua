@@ -40,6 +40,8 @@ local EnableWhisper = newCheckbox("moduleWhisper", "Шёпот", "moduleWhisper"
 local EnableGuild = newCheckbox("moduleGuild", "Гильдия", "moduleGuild")
 local EnableSay = newCheckbox("moduleSay", "Сказать", "moduleSay")
 local Debug = newCheckbox("Debug", "Дебаг", "debug")
+local MakeRaid = newCheckbox("MakeRaid", "Создание рейда при приглашении 6 игрока в группу", "makeRaid")
+local AcceptPartyGuild = newCheckbox("AcceptPartyGuild", "Авто принятия пришлашения в группу от согильдейцев", "acceptPartyGuild")
 
 -- Control placement
 title:SetPoint("TOPLEFT", 16, -16)
@@ -57,6 +59,8 @@ modules:SetPoint("TOPLEFT", Enable, "BOTTOMLEFT", 0, -10)
 EnableWhisper:SetPoint("TOPLEFT", modules, "BOTTOMLEFT", 0, -10)
 EnableGuild:SetPoint("TOPLEFT", EnableWhisper, "BOTTOMLEFT", 0, 0)
 EnableSay:SetPoint("TOPLEFT", EnableGuild, "BOTTOMLEFT", 0, 0)
+MakeRaid:SetPoint("TOPLEFT", EnableSay, "BOTTOMLEFT", 0, 0)
+AcceptPartyGuild:SetPoint("TOPLEFT", MakeRaid, "BOTTOMLEFT", 0, 0)
 Debug:SetPoint("TOPLEFT", ResetButton, "BOTTOMLEFT", 0, -10)
 
 OptionsPanel.refresh = function()
@@ -69,6 +73,8 @@ OptionsPanel.refresh = function()
 	EnableWhisper:SetChecked(ptable.TempConfig.moduleWhisper)
 	EnableGuild:SetChecked(ptable.TempConfig.moduleGuild)
 	EnableSay:SetChecked(ptable.TempConfig.moduleSay)
+	MakeRaid:SetChecked(ptable.TempConfig.makeRaid)
+	AcceptPartyGuild:SetChecked(ptable.TempConfig.acceptPartyGuild)
 
 	MakeACopy = true
 end
