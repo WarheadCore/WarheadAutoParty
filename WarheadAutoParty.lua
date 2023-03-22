@@ -1,12 +1,14 @@
 --[[
-Feel free to use this source code for any purpose ( except developing nuclear weapon! :)
-Please keep original author statement.
-@author Alex Shubert (alex.shubert@gmail.com)
+    #
+    # This file is part of the WarheadCore Project.
+    #
 ]]--
+
 local _G = _G 	--Rumors say that global _G is called by lookup in a super-global table. Have no idea whether it is true.
 local _ 		--Sometimes blizzard exposes "_" variable as a global.
 local addonName, ptable = ...
 local TOCVersion = GetAddOnMetadata(addonName, "Version")
+local SelfName = GetUnitName("player", false)
 
 WarheadAutoParty = LibStub("AceAddon-3.0"):NewAddon("WarheadAutoParty", "AceEvent-3.0", "AceConsole-3.0")
 
@@ -24,6 +26,8 @@ WarheadAutoParty.defaults =
 }
 
 WarheadAutoParty.OptionsPanel = nil
+WarheadAutoParty.NeedRaid = nil
+WarheadAutoParty.GroupMembers = {}
 
 function WarheadAutoParty:CanInvite()
     local inGroup = IsInGroup()
@@ -84,7 +88,7 @@ function WarheadAutoParty:GetCleanPlayerName(playerName)
 end
 
 function WarheadAutoParty:IsPlayerSelf(playerName)
-    return GetUnitName("player", false) == self:GetCleanPlayerName(playerName)
+    return SelfName == self:GetCleanPlayerName(playerName)
 end
 
 function WarheadAutoParty:IsPlayerInSameGuild(playerName)
@@ -139,6 +143,97 @@ function WarheadAutoParty:InvitePlayer(playerName, message)
     InviteUnit(playerName)
 end
 
+function WarheadAutoParty:InviteAllFromList()
+    if WarheadAutoParty.GroupMembers == nil then
+        return
+    end
+
+    for i = 1, #WarheadAutoParty.GroupMembers do
+        InviteUnit(WarheadAutoParty.GroupMembers[i])
+    end
+end
+
+function WarheadAutoParty:DisbandAndCollectGroup(membersCount)
+    table.wipe(WarheadAutoParty.GroupMembers)
+
+    -- Make members list
+    for j = 1, membersCount do
+		local name = GetRaidRosterInfo(j)
+
+        if name ~= SelfName then
+            table.insert(WarheadAutoParty.GroupMembers, name)
+            UninviteUnit(name)
+        end
+	end
+end
+
+function WarheadAutoParty:SendWHMessageToChat(message)
+    if not IsInGroup() then
+        print(message)
+        return
+    end
+
+    local sendChannelType = "PARTY"
+
+    if not IsInGroup(2) then
+        if inRaid then
+            sendChannelType = "RAID"
+        elseif IsInGroup(1) then
+            sendChannelType = "PARTY"
+        end
+    elseif IsInGroup(2) then
+        sendChannelType = "INSTANCE_CHAT"
+    end
+
+    SendChatMessage(message, sendChannelType)
+end
+
+function WarheadAutoParty:ReInviteParty()
+    local inInstance = IsInInstance()
+    local inGroup = IsInGroup()
+    local inRaid = IsInRaid()
+    local isLeader = UnitIsGroupLeader('player')
+    local isAssist = UnitIsGroupAssistant("player")
+    local membersCount = GetNumGroupMembers() or 0
+
+    if not inGroup then
+        print("|cFFFF0000[WH.Inv]:|r Нельзя пересобрать пати, когда вы не в ней")
+        return
+    end
+
+    if not isLeader then
+        print("|cFFFF0000[WH.Inv]:|r У вас нет прав на роспуск группы, чтобы начать пересбор пати")
+        return
+    end
+
+    if inInstance then
+        print("|cFFFF0000[WH.Inv]:|r Вы находитесь в инсте, нужно выйти из него")
+        return
+    end
+
+    local sendChannelType = "PARTY"
+
+    if not IsInGroup(2) then
+        if inRaid then
+            sendChannelType = "RAID"
+        elseif IsInGroup(1) then
+            sendChannelType = "PARTY"
+        end
+    elseif IsInGroup(2) then
+        sendChannelType = "INSTANCE_CHAT"
+    end
+
+    SendChatMessage('WH: Начался процесс пересбора пати. Количество: '..membersCount, sendChannelType)
+
+    -- if not inRaid then
+    --     ConvertToRaid()
+    -- end
+
+    WarheadAutoParty.NeedRaid = inRaid
+    self:DisbandAndCollectGroup(membersCount)
+    self:InviteAllFromList()
+end
+
 function WarheadAutoParty:OnInitialize()
     self:RegisterChatCommand("wh", "ConsoleComand")
 end
@@ -172,6 +267,8 @@ function WarheadAutoParty:RegisterEvents()
     self:RegisterEvent("CHAT_MSG_GUILD")
     self:RegisterEvent("CHAT_MSG_SAY")
     self:RegisterEvent("PARTY_INVITE_REQUEST")
+    self:RegisterEvent("GROUP_ROSTER_UPDATE")
+    self:RegisterEvent("CONFIRM_SUMMON")
 end
 
 function WarheadAutoParty:ShowOptions()
@@ -190,14 +287,21 @@ end
 
 function WarheadAutoParty:ConsoleComand(arg)
     arg = strlower(arg)
+
+    if #arg ~= 0 then
+        print("|cFFFF0000[WH.Inv]:|r Выполнение команды:", arg)
+    end
+
     if (#arg == 0) then
         self:ShowOptions()
     elseif arg == "on" then
         self:SetEnabled(true)
-        self:Print("|cFFFF0000[WH Автоинвайт]:|r Аддон включен")
+        self:Print("|cFFFF0000[WH.Inv]:|r Аддон включен")
     elseif arg == "off"  then
         self:SetEnabled(false)
-        self:Print("|cFFFF0000[WH Автоинвайт]:|r Аддон выключен")
+        self:Print("|cFFFF0000[WH.Inv]:|r Аддон выключен")
+    elseif arg == "reinv"  then
+        self:ReInviteParty()
     end
 end
 
@@ -246,4 +350,19 @@ function WarheadAutoParty:PARTY_INVITE_REQUEST(...)
     print("|cFFFF0000[WH]:|r Игрок |cff14ECCF"..playerName.."|r из вашей гильдии, принимаем пати")
     AcceptGroup()
     StaticPopup_Hide("PARTY_INVITE")
+end
+
+function WarheadAutoParty:GROUP_ROSTER_UPDATE(...)
+    if not IsInGroup() or WarheadAutoParty.NeedRaid == nil or not UnitIsGroupLeader('player')then
+        return
+    end
+
+    if WarheadAutoParty.NeedRaid then
+        ConvertToRaid()
+        WarheadAutoParty.NeedRaid = nil
+    end
+end
+
+function WarheadAutoParty:CONFIRM_SUMMON(...)
+    self:SendWHMessageToChat(string.format("Вижу суммон от %s в %s", GetSummonConfirmSummoner(), GetSummonConfirmAreaName()))
 end

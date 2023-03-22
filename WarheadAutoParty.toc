@@ -1,6 +1,6 @@
 ## Interface: 70300
 ## Title: |cFFFF0000Warhead:|r Автопати
-## Version: 1.0.0
+## Version: 1.0.1
 ## Author: WarheadCore
 ## Notes: Авто приём в пати
 ## OptionalDeps: Ace3
