@@ -1,0 +1,12 @@
+tag 39b6e0c85e7bc29f573631a5fd454963c6ec2021 7.2.2
+Author:	Alex Shubert <shubert@animatron.com>
+Date:	Sun Nov 12 04:12:17 2017 +0200
+
+7.2.2
+
+commit 38d943a95f9b6f28610d2ac9fa3cfa6c5a88498a
+Author: Alex Shubert <shubert@animatron.com>
+Date:   Sun Nov 12 04:12:17 2017 +0200
+
+    ignore some npc
+
