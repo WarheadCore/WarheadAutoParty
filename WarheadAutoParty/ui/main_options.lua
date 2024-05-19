@@ -31,7 +31,8 @@ local function newCheckbox(name, caption, config)
     cb:SetScript("OnClick", function(self)
 		ptable.TempConfig[config] = self:GetChecked()
     end)
-    return cb
+
+	return cb
 end
 
 -- 'Enable' CheckBox
@@ -42,6 +43,8 @@ local EnableSay = newCheckbox("moduleSay", "Сказать", "moduleSay")
 local Debug = newCheckbox("Debug", "Дебаг", "debug")
 local MakeRaid = newCheckbox("MakeRaid", "Создание рейда при приглашении 6 игрока в группу", "makeRaid")
 local AcceptPartyGuild = newCheckbox("AcceptPartyGuild", "Авто принятия пришлашения в группу от согильдейцев", "acceptPartyGuild")
+local AddAssistViaWhisper = newCheckbox("AddAssistViaWhisper", "Авто выдача ассиста в рейде по шёпоту через ключевое слово WH:Assist", "addAssistViaWhisper")
+local ConvertToRaidViaWhisper = newCheckbox("ConvertToRaidViaWhisper", "Авто конвертация группы в рейл по шёпоту через ключевое слово WH:Raid", "convertToRaidViaWhisper")
 
 -- Control placement
 title:SetPoint("TOPLEFT", 16, -16)
@@ -61,6 +64,8 @@ EnableGuild:SetPoint("TOPLEFT", EnableWhisper, "BOTTOMLEFT", 0, 0)
 EnableSay:SetPoint("TOPLEFT", EnableGuild, "BOTTOMLEFT", 0, 0)
 MakeRaid:SetPoint("TOPLEFT", EnableSay, "BOTTOMLEFT", 0, 0)
 AcceptPartyGuild:SetPoint("TOPLEFT", MakeRaid, "BOTTOMLEFT", 0, 0)
+AddAssistViaWhisper:SetPoint("TOPLEFT", AcceptPartyGuild, "BOTTOMLEFT", 0, 0)
+ConvertToRaidViaWhisper:SetPoint("TOPLEFT", AddAssistViaWhisper, "BOTTOMLEFT", 0, 0)
 Debug:SetPoint("TOPLEFT", ResetButton, "BOTTOMLEFT", 0, -10)
 
 OptionsPanel.refresh = function()
@@ -75,6 +80,8 @@ OptionsPanel.refresh = function()
 	EnableSay:SetChecked(ptable.TempConfig.moduleSay)
 	MakeRaid:SetChecked(ptable.TempConfig.makeRaid)
 	AcceptPartyGuild:SetChecked(ptable.TempConfig.acceptPartyGuild)
+	AddAssistViaWhisper:SetChecked(ptable.TempConfig.addAssistViaWhisper)
+	ConvertToRaidViaWhisper:SetChecked(ptable.TempConfig.convertToRaidViaWhisper)
 
 	MakeACopy = true
 end

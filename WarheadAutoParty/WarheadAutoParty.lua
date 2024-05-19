@@ -18,15 +18,17 @@ WarheadAutoParty.defaults =
     moduleWhisper = true,
     moduleGuild = true,
     moduleSay = false,
-    words = { "+", "++", "+++", "пати" },
+    wordsParty = { "+", "++", "+++", "пати", "gfnb" },
     version = TOCVersion,
     debug = true,
     makeRaid = false,
-    acceptPartyGuild = true
+    acceptPartyGuild = true,
+    addAssistViaWhisper = true,
+    convertToRaidViaWhisper = true
 }
 
 WarheadAutoParty.OptionsPanel = nil
-WarheadAutoParty.NeedRaid = nil
+WarheadAutoParty.NeedRaid = 0
 WarheadAutoParty.GroupMembers = {}
 
 function WarheadAutoParty:CanInvite()
@@ -69,7 +71,27 @@ end
 function WarheadAutoParty:IsInviteWords(message)
     message = string.lower(message)
 
-    for index, value in ipairs(WarheadAutoPartyCharacterDB.words) do
+    for index, value in ipairs(WarheadAutoPartyCharacterDB.wordsParty) do
+        if value == message then
+            return true
+        end
+    end
+
+    return false
+end
+
+function WarheadAutoParty:IsAssistWords(message)
+    for index, value in ipairs(WarheadAutoPartyCharacterDB.wordsAssist) do
+        if value == message then
+            return true
+        end
+    end
+
+    return false
+end
+
+function WarheadAutoParty:IsMakeRaidWords(message)
+    for index, value in ipairs(WarheadAutoPartyCharacterDB.wordsMakeRaid) do
         if value == message then
             return true
         end
@@ -105,12 +127,7 @@ function WarheadAutoParty:IsPlayerInSameGuild(playerName)
     return false
 end
 
-function WarheadAutoParty:InvitePlayer(playerName, message)
-    -- Check message
-    if not self:IsInviteWords(message) then
-        return
-    end
-
+function WarheadAutoParty:InvitePlayer(playerName)
     if not self:CanInvite() then
         return
     end
@@ -141,6 +158,79 @@ function WarheadAutoParty:InvitePlayer(playerName, message)
 
     -- SendChatMessage('Я уловил твоё ключевое слово ['..message..'] Держи пати :)', "WHISPER", nil, playerName)
     InviteUnit(playerName)
+end
+
+function WarheadAutoParty:AddAssistForPlayer(playerName)
+    local inRaid = IsInRaid()
+    local isLeader = UnitIsGroupLeader('player')
+    local cleanPlayerName = self:GetCleanPlayerName(playerName)
+
+    -- Just check self :D
+    if self:IsPlayerSelf(playerName) then
+        if WarheadAutoPartyCharacterDB.debug then
+            print("|cFFFF0000[WH.Inv]:|r Вы не можете выдать ассиста самому себе")
+        end
+
+        return
+    end
+
+    if not UnitInParty(cleanPlayerName) then
+        if WarheadAutoPartyCharacterDB.debug then
+            print("|cFFFF0000[WH.Inv]:|r Игрок |cff14ECCF["..playerName.."]|r не в вашей пати")
+        end
+
+        SendChatMessage('WH: Ты не в моей пати...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if not inRaid then
+        SendChatMessage('Мы с тобой даже не в рейде...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if not isLeader then
+        SendChatMessage('Я не лидер рейда...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if WarheadAutoPartyCharacterDB.debug then
+        print("|cFFFF0000[WH.Inv]:|r Выдача ассиста игроку |cff14ECCF["..playerName.."]") ;
+    end
+
+    SendChatMessage('Я уловил твоё ключевое слово. Выдал тебе ассиста :)', "WHISPER", nil, playerName)
+    PromoteToAssistant(cleanPlayerName)
+end
+
+function WarheadAutoParty:MakeRaidFromWhisper(playerName)
+    local inRaid = IsInRaid()
+    local isLeader = UnitIsGroupLeader('player')
+    local cleanPlayerName = self:GetCleanPlayerName(playerName)
+
+    if not UnitInParty(cleanPlayerName) then
+        if WarheadAutoPartyCharacterDB.debug then
+            print("|cFFFF0000[WH.Inv]:|r Игрок |cff14ECCF["..playerName.."]|r не в вашей пати")
+        end
+
+        SendChatMessage('WH: Ты не в моей пати...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if inRaid then
+        SendChatMessage('Мы с тобой уже в рейде...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if not isLeader then
+        SendChatMessage('Я не лидер рейда...', "WHISPER", nil, playerName)
+        return
+    end
+
+    if WarheadAutoPartyCharacterDB.debug then
+        print("|cFFFF0000[WH.Inv]:|r Конвертация группы в рейд...") ;
+    end
+
+    SendChatMessage('Я уловил твоё ключевое слово. Конвертнул группу в рейд :)', "WHISPER", nil, playerName)
+    ConvertToRaid()
 end
 
 function WarheadAutoParty:InviteAllFromList()
@@ -176,10 +266,8 @@ function WarheadAutoParty:SendWHMessageToChat(message)
     local sendChannelType = "PARTY"
 
     if not IsInGroup(2) then
-        if inRaid then
-            sendChannelType = "RAID"
-        elseif IsInGroup(1) then
-            sendChannelType = "PARTY"
+        if IsInRaid() then
+            sendChannelType = "RAID_WARNING"
         end
     elseif IsInGroup(2) then
         sendChannelType = "INSTANCE_CHAT"
@@ -193,7 +281,6 @@ function WarheadAutoParty:ReInviteParty()
     local inGroup = IsInGroup()
     local inRaid = IsInRaid()
     local isLeader = UnitIsGroupLeader('player')
-    local isAssist = UnitIsGroupAssistant("player")
     local membersCount = GetNumGroupMembers() or 0
 
     if not inGroup then
@@ -211,27 +298,21 @@ function WarheadAutoParty:ReInviteParty()
         return
     end
 
-    local sendChannelType = "PARTY"
+    self:SendWHMessageToChat('WH: Начался процесс пересбора пати. Количество игроков: '..membersCount)
 
-    if not IsInGroup(2) then
-        if inRaid then
-            sendChannelType = "RAID"
-        elseif IsInGroup(1) then
-            sendChannelType = "PARTY"
-        end
-    elseif IsInGroup(2) then
-        sendChannelType = "INSTANCE_CHAT"
+    local needConvertToRaid = false
+
+    if not IsInGroup(2) and inRaid then
+        needConvertToRaid = true
+        self:SendWHMessageToChat('WH: Будет создан рейд')
     end
 
-    SendChatMessage('WH: Начался процесс пересбора пати. Количество: '..membersCount, sendChannelType)
-
-    -- if not inRaid then
-    --     ConvertToRaid()
-    -- end
-
-    WarheadAutoParty.NeedRaid = inRaid
     self:DisbandAndCollectGroup(membersCount)
     self:InviteAllFromList()
+
+    if needConvertToRaid then
+        WarheadAutoParty.NeedRaid = 2
+    end
 end
 
 function WarheadAutoParty:OnInitialize()
@@ -297,39 +378,61 @@ function WarheadAutoParty:ConsoleComand(arg)
     elseif arg == "on" then
         self:SetEnabled(true)
         self:Print("|cFFFF0000[WH.Inv]:|r Аддон включен")
-    elseif arg == "off"  then
+    elseif arg == "off" then
         self:SetEnabled(false)
         self:Print("|cFFFF0000[WH.Inv]:|r Аддон выключен")
-    elseif arg == "reinv"  then
+    elseif arg == "reinv" then
         self:ReInviteParty()
     end
 end
 
 function WarheadAutoParty:CHAT_MSG_WHISPER(...)
-    if not WarheadAutoPartyCharacterDB.enabled or not WarheadAutoPartyCharacterDB.moduleWhisper then
+    if not WarheadAutoPartyCharacterDB.enabled then
         return
     end
 
     local arg1, message, playerName = ...
-    self:InvitePlayer(playerName, message)
+
+    -- Try add party
+    if WarheadAutoPartyCharacterDB.moduleWhisper and self:IsInviteWords(message) then
+        self:InvitePlayer(playerName)
+        return
+    end
+
+    if WarheadAutoPartyCharacterDB.addAssistViaWhisper and message == "WH:Assist" then
+        self:AddAssistForPlayer(playerName)
+        return
+    end
+
+    if WarheadAutoPartyCharacterDB.convertToRaidViaWhisper and message == "WH:Raid" then
+        self:MakeRaidFromWhisper(playerName)
+        return
+    end
 end
 
 function WarheadAutoParty:CHAT_MSG_GUILD(...)
-	if not WarheadAutoPartyCharacterDB.enabled or not WarheadAutoPartyCharacterDB.moduleGuild then
+	if not WarheadAutoPartyCharacterDB.enabled then
         return
     end
 
     local arg1, message, playerName = ...
-    self:InvitePlayer(playerName, message)
+
+    -- Try add party
+    if WarheadAutoPartyCharacterDB.moduleGuild and self:IsInviteWords(message) then
+        self:InvitePlayer(playerName)
+    end
 end
 
 function WarheadAutoParty:CHAT_MSG_SAY(...)
-	if not WarheadAutoPartyCharacterDB.enabled or not WarheadAutoPartyCharacterDB.moduleSay then
+	if not WarheadAutoPartyCharacterDB.enabled then
         return
     end
 
     local arg1, message, playerName = ...
-    self:InvitePlayer(playerName, message)
+
+    if WarheadAutoPartyCharacterDB.moduleSay and self:IsInviteWords(message) then
+        self:InvitePlayer(playerName)
+    end
 end
 
 function WarheadAutoParty:PARTY_INVITE_REQUEST(...)
@@ -353,14 +456,27 @@ function WarheadAutoParty:PARTY_INVITE_REQUEST(...)
 end
 
 function WarheadAutoParty:GROUP_ROSTER_UPDATE(...)
-    if not IsInGroup() or WarheadAutoParty.NeedRaid == nil or not UnitIsGroupLeader('player')then
+    if WarheadAutoParty.NeedRaid == 0 then
         return
     end
 
-    if WarheadAutoParty.NeedRaid then
-        ConvertToRaid()
-        WarheadAutoParty.NeedRaid = nil
+    local membersCount = GetNumGroupMembers() or 0
+    if membersCount == 0 then
+        WarheadAutoParty.NeedRaid = 1
+        return
     end
+
+    if not (WarheadAutoParty.NeedRaid == 1) or membersCount < 2 then
+        return
+    end
+
+    WarheadAutoParty.NeedRaid = 0
+
+    if not UnitIsGroupLeader('player') then
+        return
+    end
+
+    ConvertToRaid()
 end
 
 function WarheadAutoParty:CONFIRM_SUMMON(...)
