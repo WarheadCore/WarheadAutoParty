@@ -9,6 +9,7 @@ local _ 		--Sometimes blizzard exposes "_" variable as a global.
 local addonName, ptable = ...
 local TOCVersion = GetAddOnMetadata(addonName, "Version")
 local SelfName = GetUnitName("player", false)
+local GuildRoster = GuildRoster
 
 WarheadAutoParty = LibStub("AceAddon-3.0"):NewAddon("WarheadAutoParty", "AceEvent-3.0", "AceConsole-3.0")
 
@@ -16,13 +17,14 @@ WarheadAutoParty.defaults =
 {
     enabled = true,
     moduleWhisper = true,
-    moduleGuild = true,
+    moduleGuild = false,
     moduleSay = false,
     wordsParty = { "+", "++", "+++", "пати", "gfnb" },
     version = TOCVersion,
     debug = true,
     makeRaid = false,
-    acceptPartyGuild = true,
+    autoAcceptPartyFromFriends = true,
+    autoAcceptPartyFromGuild = true,
     addAssistViaWhisper = true,
     convertToRaidViaWhisper = true
 }
@@ -257,7 +259,7 @@ function WarheadAutoParty:DisbandAndCollectGroup(membersCount)
 	end
 end
 
-function WarheadAutoParty:SendWHMessageToChat(message)
+function WarheadAutoParty:SendWHMessageToChat(message, usingRW)
     if not IsInGroup() then
         print(message)
         return
@@ -267,7 +269,11 @@ function WarheadAutoParty:SendWHMessageToChat(message)
 
     if not IsInGroup(2) then
         if IsInRaid() then
-            sendChannelType = "RAID_WARNING"
+            if usingRW then
+                sendChannelType = "RAID_WARNING"
+            else
+                sendChannelType = "RAID"
+            end
         end
     elseif IsInGroup(2) then
         sendChannelType = "INSTANCE_CHAT"
@@ -298,13 +304,13 @@ function WarheadAutoParty:ReInviteParty()
         return
     end
 
-    self:SendWHMessageToChat('WH: Начался процесс пересбора пати. Количество игроков: '..membersCount)
+    self:SendWHMessageToChat('WH: Начался процесс пересбора пати. Количество игроков: '..membersCount, true)
 
     local needConvertToRaid = false
 
     if not IsInGroup(2) and inRaid then
         needConvertToRaid = true
-        self:SendWHMessageToChat('WH: Будет создан рейд')
+        self:SendWHMessageToChat('WH: Будет создан рейд', true)
     end
 
     self:DisbandAndCollectGroup(membersCount)
@@ -436,21 +442,51 @@ function WarheadAutoParty:CHAT_MSG_SAY(...)
 end
 
 function WarheadAutoParty:PARTY_INVITE_REQUEST(...)
-    if not WarheadAutoPartyCharacterDB.enabled or not WarheadAutoPartyCharacterDB.acceptPartyGuild then
+    if not WarheadAutoPartyCharacterDB.enabled then
         return
     end
 
-    local arg1, playerName = ...
+    local _, playerName = ...
 
-    if not IsInGuild() then
+    if IsInGroup() then
         return
     end
 
-    if not self:IsPlayerInSameGuild(playerName) then
+    local friendName, guildMemberName;
+    local isAccepted = false;
+
+    if GetNumFriends() > 0 and WarheadAutoPartyCharacterDB.autoAcceptPartyFromFriends then
+        ShowFriends()
+
+        for friendIndex = 1, GetNumFriends() do
+            friendName = GetFriendInfo(friendIndex)
+            if friendName and (friendName == playerName) then
+                AcceptGroup()
+                isAccepted = true
+                print("|cFFFF0000[WH]:|r Игрок |cff14ECCF"..playerName.."|r из списка выших друзей, принимаем пати")
+                break
+            end
+        end
+    end
+
+    if IsInGuild() and WarheadAutoPartyCharacterDB.autoAcceptPartyFromGuild and not isAccepted then
+        GuildRoster()
+
+        for guildIndex = 1, GetNumGuildMembers(true) do
+            guildMemberName = GetGuildRosterInfo(guildIndex)
+            if guildMemberName and (self:GetCleanPlayerName(guildMemberName) == playerName) then
+                AcceptGroup()
+                isAccepted = true
+                print("|cFFFF0000[WH]:|r Игрок |cff14ECCF"..playerName.."|r из вашей гильдии, принимаем пати")
+                break
+            end
+        end
+    end
+
+    if not isAccepted then
         return
     end
 
-    print("|cFFFF0000[WH]:|r Игрок |cff14ECCF"..playerName.."|r из вашей гильдии, принимаем пати")
     AcceptGroup()
     StaticPopup_Hide("PARTY_INVITE")
 end
@@ -480,5 +516,5 @@ function WarheadAutoParty:GROUP_ROSTER_UPDATE(...)
 end
 
 function WarheadAutoParty:CONFIRM_SUMMON(...)
-    self:SendWHMessageToChat(string.format("Вижу суммон от %s в %s", GetSummonConfirmSummoner(), GetSummonConfirmAreaName()))
+    self:SendWHMessageToChat(string.format("Вижу суммон от %s в %s", GetSummonConfirmSummoner(), GetSummonConfirmAreaName()), false)
 end
