@@ -72,7 +72,7 @@ Debug:SetPoint("TOPLEFT", ResetButton, "BOTTOMLEFT", 0, -10)
 
 OptionsPanel.refresh = function()
 	if (MakeACopy) then
-		ptable.TempConfig = CopyTable(WarheadAutoPartyCharacterDB)
+		ptable.TempConfig = CopyTable(WarheadAutoPartyADB)
 	end
 
 	Enable:SetChecked(ptable.TempConfig.enabled)
@@ -94,8 +94,8 @@ OptionsPanel.default = function()
 end
 
 OptionsPanel.okay = function()
-	WarheadAutoPartyCharacterDB = CopyTable(ptable.TempConfig)
-	WarheadAutoParty:SetEnabled(WarheadAutoPartyCharacterDB.enabled)
+	WarheadAutoPartyADB = CopyTable(ptable.TempConfig)
+	WarheadAutoParty:SetEnabled(WarheadAutoPartyADB.enabled)
 end
 
 InterfaceOptions_AddCategory(OptionsPanel)

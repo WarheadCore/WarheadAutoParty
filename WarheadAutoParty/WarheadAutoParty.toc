@@ -1,10 +1,10 @@
 ## Interface: 70300
 ## Title: |cFFFF0000Warhead:|r Автопати
-## Version: 1.1.0
+## Version: 1.1.1
 ## Author: Winfidonarleyan from WarheadCore
 ## Notes: Авто приём в пати и не только
 ## OptionalDeps: Ace3
-## SavedVariablesPerCharacter: WarheadAutoPartyCharacterDB
+## SavedVariables: WarheadAutoPartyADB
 ## X-Date: 2024-05-26
 ## X-Embeds: Ace3
 
